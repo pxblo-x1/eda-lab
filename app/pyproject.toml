@@ -1,0 +1,11 @@
+[project]
+name = "eda-demo"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.111.0",
+    "uvicorn==0.29.0",
+    "redis==5.0.4",
+    "jinja2==3.1.4",
+    "python-multipart==0.0.9",
+]

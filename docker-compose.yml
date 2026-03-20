@@ -1,0 +1,32 @@
+services:
+  redis:
+    image: redis:8.0.6-alpine3.21
+    ports:
+      - "6379:6379"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+
+  app:
+    build: ./app
+    image: eda-lab/redis-app:latest
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - default
+      - cloudflared-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+
+networks:
+  cloudflared-net:
+    external: true

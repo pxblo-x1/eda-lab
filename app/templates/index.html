@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Event Driven Architecture — Demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f8f9fa;
+      color: #1a1a2e;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1B1B3A;
+      color: #fff;
+      text-align: center;
+      padding: 18px 24px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    header span {
+      color: #A8D8EA;
+    }
+
+    .grid {
+      display: flex;
+      flex: 1;
+      gap: 16px;
+      padding: 20px;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      height: calc(100vh - 64px);
+    }
+
+    .column {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-radius: 10px;
+      background: #fff;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .column-header {
+      padding: 14px 18px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border-bottom: 1px solid #eee;
+    }
+
+    /* Producer */
+    .producer .column-header  { background: #fff0f6; color: #D81B75; border-top: 4px solid #D81B75; }
+    /* Broker */
+    .broker .column-header    { background: #f0f0f8; color: #1B1B3A; border-top: 4px solid #1B1B3A; }
+    /* Consumer */
+    .consumer .column-header  { background: #f0f8fb; color: #1B6A8A; border-top: 4px solid #A8D8EA; }
+
+    .column-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    /* ── Producer buttons ── */
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .event-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      border: 2px solid #D81B75;
+      border-radius: 8px;
+      background: #fff;
+      color: #D81B75;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, opacity 0.15s;
+    }
+
+    .event-btn:hover:not(:disabled) {
+      background: #D81B75;
+      color: #fff;
+    }
+
+    .event-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .event-btn .icon { font-size: 1.2rem; }
+
+    .counter {
+      margin-top: 20px;
+      font-size: 0.8rem;
+      color: #888;
+      text-align: center;
+    }
+
+    .counter strong { color: #D81B75; }
+
+    /* ── Broker / Consumer items ── */
+    .event-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .event-item {
+      border: 1px solid #eee;
+      border-radius: 7px;
+      padding: 10px 12px;
+      font-size: 0.82rem;
+      background: #fafafa;
+    }
+
+    .event-item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .event-item-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      color: #1B1B3A;
+    }
+
+    .event-id {
+      font-family: monospace;
+      font-size: 0.72rem;
+      color: #999;
+      margin-top: 3px;
+    }
+
+    .event-ts {
+      font-size: 0.72rem;
+      color: #aaa;
+      white-space: nowrap;
+    }
+
+    .badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .badge-pending  { background: #fff8d6; color: #8a6800; }
+    .badge-processed { background: #d6f5e0; color: #1a7a3a; }
+
+    /* Consumer items */
+    .consumer-item {
+      border: 1px solid #d0eaf5;
+      border-radius: 7px;
+      padding: 10px 12px;
+      font-size: 0.82rem;
+      background: #f5fbff;
+      animation: fadeSlide 0.3s ease both;
+    }
+
+    .consumer-msg {
+      font-weight: 600;
+      color: #1B1B3A;
+      margin-bottom: 4px;
+    }
+
+    .consumer-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: #888;
+    }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .empty-hint {
+      color: #ccc;
+      font-size: 0.8rem;
+      text-align: center;
+      margin-top: 30px;
+    }
+
+    /* SSE status dot */
+    .sse-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #ccc;
+      margin-right: 5px;
+      vertical-align: middle;
+      transition: background 0.3s;
+    }
+    .sse-dot.connected { background: #2ecc71; }
+  </style>
+</head>
+<body>
+
+<header>
+  Event Driven Architecture — <span>Demo</span>
+  &nbsp;·&nbsp;
+  <span id="sse-status" style="font-size:0.75rem; font-weight:400; opacity:0.8">
+    <span class="sse-dot" id="sse-dot"></span>connecting…
+  </span>
+</header>
+
+<div class="grid">
+
+  <!-- ── PRODUCER ── -->
+  <div class="column producer">
+    <div class="column-header">Producer</div>
+    <div class="column-body">
+      <div class="btn-group">
+        <button class="event-btn" id="btn-deploy" data-type="deploy">
+          <span class="icon">🚀</span> Deploy Exitoso
+        </button>
+        <button class="event-btn" id="btn-cpu" data-type="cpu_alert">
+          <span class="icon">🔴</span> CPU Crítico
+        </button>
+        <button class="event-btn" id="btn-error" data-type="error_500">
+          <span class="icon">❌</span> Error 500
+        </button>
+      </div>
+      <p class="counter">Publicados en esta sesión: <strong id="pub-count">0</strong></p>
+    </div>
+  </div>
+
+  <!-- ── BROKER ── -->
+  <div class="column broker">
+    <div class="column-header">Broker · Redis Streams</div>
+    <div class="column-body">
+      <div class="event-list" id="broker-list">
+        <p class="empty-hint">Esperando eventos…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONSUMER ── -->
+  <div class="column consumer">
+    <div class="column-header">Consumer</div>
+    <div class="column-body">
+      <div class="event-list" id="consumer-list">
+        <p class="empty-hint">Esperando eventos procesados…</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── Constants ──────────────────────────────────────────────────
+  const PAYLOADS = {
+    deploy:    { app: "api-gateway", version: "2.4.1", env: "production" },
+    cpu_alert: { server: "prod-server-03", cpu: 94, threshold: 80 },
+    error_500: { service: "payments-api", endpoint: "/checkout", code: 500 },
+  };
+
+  const TYPE_ICONS = {
+    deploy:    "🚀",
+    cpu_alert: "🔴",
+    error_500: "❌",
+  };
+
+  const TYPE_LABELS = {
+    deploy:    "Deploy Exitoso",
+    cpu_alert: "CPU Crítico",
+    error_500: "Error 500",
+  };
+
+  // ── State ──────────────────────────────────────────────────────
+  let pubCount = 0;
+  // Map<msgId, brokerItemEl>  — to update badge later
+  const brokerItems = new Map();
+  // Set of inflight message ids (used to re-enable buttons)
+  const pendingIds = new Set();
+  // Map<type, buttonEl>  — buttons waiting on specific event types
+  const btnByType = new Map();
+
+  // ── DOM ────────────────────────────────────────────────────────
+  const brokerList   = document.getElementById("broker-list");
+  const consumerList = document.getElementById("consumer-list");
+  const pubCountEl   = document.getElementById("pub-count");
+  const sseDot       = document.getElementById("sse-dot");
+  const sseStatus    = document.getElementById("sse-status");
+
+  // ── Helpers ───────────────────────────────────────────────────
+  function fmtTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+
+  function shortId(id) {
+    return id.slice(0, 12);
+  }
+
+  function removeEmptyHint(list) {
+    const hint = list.querySelector(".empty-hint");
+    if (hint) hint.remove();
+  }
+
+  function consumerMessage(ev) {
+    const p = ev.payload;
+    switch (ev.type) {
+      case "deploy":
+        return `✅ Deploy completado: ${p.app} v${p.version} en ${p.env}`;
+      case "cpu_alert":
+        return `🚨 Alerta procesada: ${p.server} al ${p.cpu}% — escalando`;
+      case "error_500":
+        return `🔧 Error registrado: ${p.service} en ${p.endpoint}`;
+      default:
+        return `Evento procesado: ${ev.type}`;
+    }
+  }
+
+  function elapsedMs(from, to) {
+    const ms = new Date(to) - new Date(from);
+    return ms < 1000 ? `${ms}ms` : `${(ms/1000).toFixed(1)}s`;
+  }
+
+  // ── Publish ───────────────────────────────────────────────────
+  document.querySelectorAll(".event-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const type = btn.dataset.type;
+
+      // Disable briefly, track by type
+      btn.disabled = true;
+      setTimeout(() => { /* stays disabled until processed — see SSE handler */ }, 300);
+      btnByType.set(type, btn);
+
+      const body = { type, payload: PAYLOADS[type] };
+      try {
+        const res = await fetch("/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        pendingIds.add(data.id);
+        pubCount++;
+        pubCountEl.textContent = pubCount;
+      } catch (err) {
+        console.error("publish error", err);
+        btn.disabled = false;
+        btnByType.delete(type);
+      }
+    });
+  });
+
+  // ── SSE ───────────────────────────────────────────────────────
+  function connectSSE() {
+    const source = new EventSource("/stream");
+
+    source.addEventListener("open", () => {
+      sseDot.className = "sse-dot connected";
+      sseStatus.innerHTML = '<span class="sse-dot connected"></span>conectado';
+    });
+
+    source.addEventListener("error", () => {
+      sseDot.className = "sse-dot";
+      sseStatus.innerHTML = '<span class="sse-dot"></span>reconectando…';
+    });
+
+    // broker_received — event entered the stream
+    source.addEventListener("broker_received", (e) => {
+      const ev = JSON.parse(e.data);
+      addBrokerItem(ev);
+    });
+
+    // consumer_processed — consumer finished processing
+    source.addEventListener("consumer_processed", (e) => {
+      const ev = JSON.parse(e.data);
+      updateBrokerBadge(ev.id);
+      addConsumerItem(ev);
+      pendingIds.delete(ev.id);
+
+      // Re-enable button for this event type
+      const btn = btnByType.get(ev.type);
+      if (btn) {
+        btn.disabled = false;
+        btnByType.delete(ev.type);
+      }
+    });
+  }
+
+  function addBrokerItem(ev) {
+    removeEmptyHint(brokerList);
+
+    const item = document.createElement("div");
+    item.className = "event-item";
+    item.dataset.msgId = ev.id;
+    item.innerHTML = `
+      <div class="event-item-row">
+        <span class="event-item-left">
+          <span>${TYPE_ICONS[ev.type] || "📨"}</span>
+          <span>${TYPE_LABELS[ev.type] || ev.type}</span>
+        </span>
+        <span class="badge badge-pending" id="badge-${CSS.escape(ev.id)}">en cola</span>
+      </div>
+      <div class="event-item-row" style="margin-top:4px">
+        <span class="event-id">${shortId(ev.id)}</span>
+        <span class="event-ts">${fmtTime(ev.timestamp)}</span>
+      </div>
+    `;
+
+    // Prepend (newest on top), keep max 10 visible
+    brokerList.prepend(item);
+    brokerItems.set(ev.id, item);
+    trimList(brokerList, 10);
+  }
+
+  function updateBrokerBadge(msgId) {
+    const badge = document.getElementById("badge-" + CSS.escape(msgId));
+    if (badge) {
+      badge.className = "badge badge-processed";
+      badge.textContent = "procesado";
+    }
+  }
+
+  function addConsumerItem(ev) {
+    removeEmptyHint(consumerList);
+
+    const item = document.createElement("div");
+    item.className = "consumer-item";
+    const elapsed = elapsedMs(ev.broker_received_at, ev.processed_at);
+    item.innerHTML = `
+      <div class="consumer-msg">${consumerMessage(ev)}</div>
+      <div class="consumer-meta">
+        <span>⏱ ${elapsed}</span>
+        <span>${fmtTime(ev.processed_at)}</span>
+      </div>
+    `;
+    consumerList.prepend(item);
+    trimList(consumerList, 10);
+  }
+
+  function trimList(list, max) {
+    const items = list.querySelectorAll(".event-item, .consumer-item");
+    for (let i = max; i < items.length; i++) {
+      items[i].remove();
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────────────
+  connectSSE();
+</script>
+</body>
+</html>
