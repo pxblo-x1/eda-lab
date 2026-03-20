@@ -28,25 +28,53 @@ sequenceDiagram
     S-->>U: badge ✅ procesado + animación
 ```
 
+### ¿Cómo leer el diagrama?
+
+El diagrama muestra el viaje completo de un evento desde que haces click hasta que aparece procesado en el browser. De izquierda a derecha hay 5 participantes:
+
+**1. Browser → Producer** `click botón`
+Cuando haces click en uno de los botones, el browser hace un `POST /publish` al backend.
+
+**2. Producer → Broker** `XADD *`
+El backend escribe el evento en Redis Streams. El `*` significa "Redis, asígnale un ID automático".
+
+**3. Producer → Browser** `{ id }`
+Redis devuelve el ID generado y el backend se lo retorna al browser. En este momento el evento ya está en la cola.
+
+**4. Broker → SSE** `broker_received`
+El consumer background task lee el evento del stream y lo manda por el canal SSE.
+
+**5. SSE → Browser** `badge 🟡 en cola`
+El browser recibe el evento SSE y pinta el badge amarillo en la columna del Broker — el evento llegó pero aún no fue procesado.
+
+**6. Consumer → Broker** `XREAD block=1000ms`
+El consumer está constantemente preguntándole a Redis "¿hay mensajes nuevos?" — el `block=1000ms` significa que espera hasta 1 segundo antes de preguntar de nuevo.
+
+**7. Broker → Consumer** `mensaje`
+Redis le entrega el evento al consumer.
+
+**8. Consumer** `sleep 0.5–1.5s`
+El consumer simula trabajo real con un sleep aleatorio. En una app real aquí iría la lógica de negocio.
+
+**9. Consumer → SSE** `consumer_processed`
+Terminado el procesamiento, el consumer notifica al canal SSE.
+
+**10. SSE → Browser** `badge ✅ procesado + animación`
+El browser actualiza el badge a verde en la columna Broker y hace aparecer el evento en la columna Consumer con la animación.
+
+> 💡 La clave del diagrama es que el **Producer y el Consumer son independientes** — el Producer no espera a que el Consumer termine. Redis Streams actúa como buffer entre los dos, lo que es la esencia de una arquitectura event-driven.
+
 ---
 
 ## 🚀 Quickstart
 
-**1. Genera el lockfile** (solo la primera vez):
-
-```bash
-cd app
-uv lock
-cd ..
-```
-
-**2. Levanta los servicios:**
+**1. Levanta los servicios:**
 
 ```bash
 docker compose up --build
 ```
 
-**3. Abre el browser:**
+**2. Abre el browser:**
 
 ```
 http://localhost:8000
@@ -60,9 +88,8 @@ http://localhost:8000
 eda-lab/
 ├── docker-compose.yml      # Redis + App
 └── app/
-    ├── Dockerfile           # python:3.12-slim + uv
+    ├── Dockerfile           # python:3.14-alpine + uv
     ├── pyproject.toml       # dependencias del proyecto
-    ├── uv.lock              # lockfile reproducible
     ├── main.py              # FastAPI: producer, consumer, SSE
     └── templates/
         └── index.html       # UI de tres columnas (sin frameworks)
@@ -130,11 +157,12 @@ docker compose start app
 docker compose logs -f app
 ```
 
-Ejemplo de salida:
+Ejemplo de salida con colores ANSI:
 
 ```
-12:34:01 [INFO] PRODUCER  → published  type=deploy     id=1710851641234-0
-12:34:01 [INFO] BROKER    → received   type=deploy     id=1710851641234-0
-12:34:01 [INFO] CONSUMER  → processing type=deploy     id=1710851641234-0 (0.87s)
-12:34:02 [INFO] CONSUMER  → processed  type=deploy     id=1710851641234-0
+10:23:55 PRODUCER  → publishing type=error_500  payload={...}
+10:23:55 PRODUCER  → published  type=error_500  id=1773977035955-0
+10:23:55 BROKER    → received   type=error_500  id=1773977035955-0
+10:23:55 CONSUMER  → processing type=error_500  id=1773977035955-0 (1.05s)
+10:23:57 CONSUMER  → processed  type=error_500  id=1773977035955-0
 ```
